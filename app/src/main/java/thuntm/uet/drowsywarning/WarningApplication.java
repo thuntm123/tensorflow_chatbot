@@ -14,17 +14,19 @@
  *
  */
 
-package com.tzutalin.dlibtest;
+package thuntm.uet.drowsywarning;
 
 import android.app.Application;
 import android.util.Log;
+
+import com.tzutalin.dlibtest.BuildConfig;
 
 import timber.log.Timber;
 
 /**
  * Created by tzutalin on 2017/2/23.
  */
-public class DlibDemoApp extends Application {
+public class WarningApplication extends android.app.Application {
     @Override
     public void onCreate() {
         super.onCreate();

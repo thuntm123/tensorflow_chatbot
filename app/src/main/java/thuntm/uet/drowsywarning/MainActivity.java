@@ -1,4 +1,4 @@
-package com.tzutalin.dlibtest;
+package thuntm.uet.drowsywarning;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -36,18 +36,17 @@ import android.view.WindowManager;
 import com.tzutalin.dlib.Constants;
 import com.tzutalin.dlib.FaceDet;
 import com.tzutalin.dlib.VisionDetRet;
+import com.tzutalin.dlibtest.R;
 
-import junit.framework.Assert;
-
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
+public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
-    private static final String TAG = "DrawonCamera";
+    private static final String TAG = "MainActivity";
     SurfaceView cameraView, transparentView, rectView;
 
     SurfaceHolder holder, holderTransparent, holderRect;
@@ -58,7 +57,7 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
     private Allocation in, out;
     Camera camera;
 
-    private Paint mFaceLandmardkPaint;
+    private Paint mFaceLandmardkPaint, TextPaint;
     private Handler mInferenceHandler;
     private HandlerThread inferenceThread;
     private Canvas canvas = null;
@@ -143,6 +142,13 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
         mFaceLandmardkPaint.setColor(Color.GREEN);
         mFaceLandmardkPaint.setStrokeWidth(2);
         mFaceLandmardkPaint.setStyle(Paint.Style.STROKE);
+        mFaceLandmardkPaint.setTextSize(20 * getResources().getDisplayMetrics().density);
+
+        TextPaint = new Paint();
+        TextPaint.setColor(Color.RED);
+        TextPaint.setStrokeWidth(2);
+        TextPaint.setStyle(Paint.Style.STROKE);
+        TextPaint.setTextSize(20 * getResources().getDisplayMetrics().density);
 
         inferenceThread = new HandlerThread("InferenceThread");
         inferenceThread.start();
@@ -175,7 +181,7 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
         Rect rec=new Rect((int) RectLeft,(int)RectTop,(int)RectRight,(int)RectBottom);
 
         canvas1.drawRect(rec,paint);
-
+        canvas1.drawText("EAR:",50, 90, mFaceLandmardkPaint);
         holderRect.unlockCanvasAndPost(canvas1);
 
     }
@@ -222,19 +228,14 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
                     final int widthX = imageBitmap.getWidth()/4;
                     imageBitmap = Bitmap.createBitmap(imageBitmap,widthX,0, 250, 250);
 
-                   // List<VisionDetRet> results = mFaceDet.detect(imageBitmap);
-                   // Log.i(TAG, "on cameraframe " + width + "  " + height + " result " + results.size());
                     Log.i(TAG, "Param  " + parameters.getPreviewFormat());
-                   //
-                    //  mTransparentTitleView.setText("Time cost: " + String.valueOf((endTime - startTime) / 1000f) + " sec");
-                    // Draw on bitmap
+
 
                                     if (!new File(Constants.getFaceShapeModelPath()).exists()) {
-                                        //    mTransparentTitleView.setText("Copying landmark model to " + Constants.getFaceShapeModelPath());
                                         FileUtils.copyFileFromRawToOthers(mContext, R.raw.shape_predictor_68_face_landmarks, Constants.getFaceShapeModelPath());
                                     }
                                     List<VisionDetRet> results;
-                                    synchronized (DrawonCamera.this) {
+                                    synchronized (MainActivity.this) {
                                         results = mFaceDet.detect(imageBitmap);
                                     }
                                     Log.i(TAG, "on cameraframe");
@@ -271,26 +272,32 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
                                             canvas.drawLine((w-eyePointsR.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(3).y - offsetY)*resizeRatio, (w-eyePointsR.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(4).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
                                             canvas.drawLine((w-eyePointsR.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(4).y - offsetY)*resizeRatio, (w-eyePointsR.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(5).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
                                             canvas.drawLine((w-eyePointsR.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(5).y - offsetY)*resizeRatio, (w-eyePointsR.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(0).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            holderTransparent.unlockCanvasAndPost(canvas);
+
                                             Log.i(TAG,"Test======");
 
                                             double EAR = (compute_EAR(eyePointsL) + compute_EAR(eyePointsR))/2;
+                                            DecimalFormat twoDForm = new DecimalFormat("#.##");
+                                            EAR = Double.valueOf(twoDForm.format(EAR));
+                                            String ear = String.valueOf(EAR);
+
                                             Log.i(TAG,"EAR ===== ");
                                             if(EAR < 0.2)
                                             {
                                                 count++;
-                                                if(count >=2)
+                                                canvas.drawText(ear, 180, 90, TextPaint);
+                                                if(count >=14)
                                                 {
                                                     playWarning();
                                                 }
                                             }
                                             else {
+                                                canvas.drawText(ear, 180, 90, mFaceLandmardkPaint);
                                                 if(mp.isPlaying())
                                                     mp.pause();
 
                                                 count = 0;
                                             }
-
+                                            holderTransparent.unlockCanvasAndPost(canvas);
 
                                         }
                                     }

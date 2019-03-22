@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.tzutalin.dlibtest;
+package thuntm.uet.drowsywarning;
 
 import android.content.Context;
 import android.support.annotation.NonNull;
