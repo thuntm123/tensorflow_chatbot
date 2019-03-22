@@ -3,6 +3,8 @@ package com.tzutalin.dlibtest;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
+import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -39,6 +41,7 @@ import junit.framework.Assert;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -97,8 +100,23 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
         //holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
         cameraView.setSecure(true);
-        //mp = (MediaPlayer) MediaPlayer.create(this, R.raw.warning);
+        mp = (MediaPlayer) MediaPlayer.create(this, R.raw.warning);
+        AssetManager am = this.getAssets();
+        try {
+            AssetFileDescriptor afd = am.openFd("android.resource://"+getPackageName()+"/"+R.raw.warning);
+            mp.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
+        mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mediaPlayer) {
+            }
+        });
+
+        mp.setLooping(true);
+       // playWarning();
         transparentView = (SurfaceView) findViewById(R.id.TransparentView);
 
         holderTransparent = transparentView.getHolder();
@@ -258,30 +276,20 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
 
                                             double EAR = (compute_EAR(eyePointsL) + compute_EAR(eyePointsR))/2;
                                             Log.i(TAG,"EAR ===== ");
-                                            /*if(EAR < 0.2) {
-                                                count += 1;
-                                                if (mp != null) {
-                                                    // mp.reset();
-                                                    mp.release();
-                                                }
-                                                if (count >= 1) {
-                                                    Log.i(TAG, "MediaPlayer======");
-                                                    mp.start();
+                                            if(EAR < 0.2)
+                                            {
+                                                count++;
+                                                if(count >=2)
+                                                {
+                                                    playWarning();
                                                 }
                                             }
-                                            else
+                                            else {
+                                                if(mp.isPlaying())
+                                                    mp.pause();
+
                                                 count = 0;
-
-                                            mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                                                @Override
-                                                public void onCompletion(MediaPlayer mediaPlayer) {
-                                                    mp.stop();
-                                                    if (mp != null) {
-                                                        mp.release();
-                                                    }
-
-                                                }
-                                            });*/
+                                            }
 
 
                                         }
@@ -297,6 +305,14 @@ public class DrawonCamera extends Activity implements SurfaceHolder.Callback {
             return;
         }
     }
+    private void playWarning() {
+        if (mp != null) {
+            // mp.reset();
+            //mp.release();
+        }
+        mp.start();
+    }
+
 
     public static double compute_EAR(List<Point> eye){
         float aX = Math.abs(eye.get(1).x - eye.get(5).x);
