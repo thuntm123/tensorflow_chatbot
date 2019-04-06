@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginTop="20dp"
+        android:text="Cảnh báo buồn ngủ là một ứng dụng Android giúp bạn tập trung trong suốt quá trình lái xe.\n\nKhi bạn vô tình chợp mắt trong khoảng 1s thì hệ thống sẽ đưa ra tín hiệu cảnh báo.\n\nĐể hệ thống có thể phát hiện gương mặt của bạn từ camera, hãy cài đặt điện thoại sao cho mặt của bạn nằm trong vùng chữ nhật màu xanh.\n\nChúc bạn có một hành trình lái xe an toàn và vui vẻ!"
+        android:id="@+id/textView" />
+
+    <Button
+        android:id="@+id/button1"
+        style="@style/Widget.AppCompat.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#3F51B5"
+        android:padding="20dp"
+        android:layout_marginBottom="10dp"
+        android:text="Bắt đầu"
+        android:visibility="visible"
+        android:layout_below="@+id/textView"
+        android:layout_centerHorizontal="true" />
+</RelativeLayout>

@@ -1,8 +1,9 @@
 package thuntm.uet.drowsywarning;
 
-import android.annotation.TargetApi;
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
@@ -16,8 +17,10 @@ import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.media.MediaPlayer;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Trace;
@@ -26,12 +29,15 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import com.tzutalin.dlib.Constants;
 import com.tzutalin.dlib.FaceDet;
@@ -43,6 +49,8 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
+
+import hugo.weaving.DebugLog;
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
@@ -62,12 +70,19 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private HandlerThread inferenceThread;
     private Canvas canvas = null;
     private int count = 0, k = 0, cnt = 0;
-
+    private static final int MY_CAMERA_REQUEST_CODE = 100;
     int deviceHeight, deviceWidth;
     Bitmap imageBitmap;
     private FaceDet mFaceDet;
     private Context mContext;
     private float RectLeft, RectTop, RectRight, RectBottom;
+    private static final int REQUEST_CODE_PERMISSION = 2;
+
+    private static String[] PERMISSIONS_REQ = {
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.CAMERA
+    };
 
     MediaPlayer mp;
 
@@ -79,13 +94,15 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         return Resources.getSystem().getDisplayMetrics().heightPixels;
     }
 
-    @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
+    @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
 
+        mContext = this;
         rs = RenderScript.create(this);
+
         yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 
         setContentView(R.layout.activity_drawon_camera);
@@ -99,6 +116,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         //holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
         cameraView.setSecure(true);
+
         mp = (MediaPlayer) MediaPlayer.create(this, R.raw.warning);
         AssetManager am = this.getAssets();
         try {
@@ -108,6 +126,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
             e.printStackTrace();
         }
 
+
         mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer mediaPlayer) {
@@ -115,7 +134,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         });
 
         mp.setLooping(true);
-       // playWarning();
+        // playWarning();
         transparentView = (SurfaceView) findViewById(R.id.TransparentView);
 
         holderTransparent = transparentView.getHolder();
@@ -154,9 +173,54 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         inferenceThread.start();
         mInferenceHandler = new Handler(inferenceThread.getLooper());
 
+        isExternalStorageWritable();
+        isExternalStorageReadable();
 
+        int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+        if (currentapiVersion >= Build.VERSION_CODES.M) {
+            verifyPermissions(this);
+        }
     }
 
+    private static boolean verifyPermissions(Activity activity) {
+        // Check if we have write permission
+        int write_permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        int read_persmission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        int camera_permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.CAMERA);
+
+        if (write_permission != PackageManager.PERMISSION_GRANTED ||
+                read_persmission != PackageManager.PERMISSION_GRANTED ||
+                camera_permission != PackageManager.PERMISSION_GRANTED) {
+            // We don't have permission so prompt the user
+            ActivityCompat.requestPermissions(
+                    activity,
+                    PERMISSIONS_REQ,
+                    REQUEST_CODE_PERMISSION
+            );
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /* Checks if external storage is available for read and write */
+    private boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
+    }
+
+    /* Checks if external storage is available to at least read */
+    private boolean isExternalStorageReadable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state) ||
+                Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+            return true;
+        }
+        return false;
+    }
 
     private void Draw() {
 
@@ -185,9 +249,21 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         holderRect.unlockCanvasAndPost(canvas1);
 
     }
-    @Override
 
+    @Override
     public void surfaceCreated(final SurfaceHolder holder) {
+
+        new AsyncTask<Void, Void, Void>() {
+
+            @Override
+            protected Void doInBackground(Void... voids) {
+                if (!new File(Constants.getFaceShapeModelPath()).exists()) {
+                    FileUtils.copyFileFromRawToOthers(getApplicationContext(), R.raw.shape_predictor_68_face_landmarks, Constants.getFaceShapeModelPath());
+                }
+
+                return null;
+            }
+        }.execute();
 
         try {
 
@@ -231,77 +307,76 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
                     Log.i(TAG, "Param  " + parameters.getPreviewFormat());
 
 
-                                    if (!new File(Constants.getFaceShapeModelPath()).exists()) {
-                                        FileUtils.copyFileFromRawToOthers(mContext, R.raw.shape_predictor_68_face_landmarks, Constants.getFaceShapeModelPath());
-                                    }
-                                    List<VisionDetRet> results;
-                                    synchronized (MainActivity.this) {
-                                        results = mFaceDet.detect(imageBitmap);
-                                    }
-                                    Log.i(TAG, "on cameraframe");
-                                    if (results != null) {
-                                        for (final VisionDetRet ret : results) {
-                                            float resizeRatio = 4.0f;
-                                            float w = imageBitmap.getWidth();
-                                            float h = imageBitmap.getHeight();
-                                            int offsetX = 30;
-                                            int offsetY = 6;
-                                            Rect bounds = new Rect();
-                                            bounds.left = (int) ((w - ret.getLeft() + widthX- offsetX) * resizeRatio );
-                                            bounds.top = (int) ((ret.getTop() - offsetY) * resizeRatio);
-                                            bounds.right = (int) ((w - ret.getRight() + widthX - offsetX) * resizeRatio);
-                                            bounds.bottom = (int) ((ret.getBottom() - offsetY) * resizeRatio);
-                                            canvas = holderTransparent.lockCanvas(null);
-                                            canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                                            canvas.drawRect(bounds, mFaceLandmardkPaint);
 
-                                            // Draw landmark
-                                            ArrayList<Point> landmarks = ret.getFaceLandmarks();
-                                            List<Point> eyePointsL = landmarks.subList(36, 42);
-                                            canvas.drawLine((w-eyePointsL.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(0).y - offsetY)*resizeRatio, (w-eyePointsL.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(1).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsL.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(1).y - offsetY)*resizeRatio, (w-eyePointsL.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(2).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsL.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(2).y - offsetY)*resizeRatio, (w-eyePointsL.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(3).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsL.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(3).y - offsetY)*resizeRatio, (w-eyePointsL.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(4).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsL.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(4).y - offsetY)*resizeRatio, (w-eyePointsL.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(5).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsL.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(5).y - offsetY)*resizeRatio, (w-eyePointsL.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(0).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                    List<VisionDetRet> results;
+                    synchronized (MainActivity.this) {
+                        results = mFaceDet.detect(imageBitmap);
+                    }
 
-                                            List<Point> eyePointsR = landmarks.subList(42, 48);
-                                            canvas.drawLine((w-eyePointsR.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(0).y - offsetY)*resizeRatio, (w-eyePointsR.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(1).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsR.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(1).y - offsetY)*resizeRatio, (w-eyePointsR.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(2).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsR.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(2).y - offsetY)*resizeRatio, (w-eyePointsR.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(3).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsR.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(3).y - offsetY)*resizeRatio, (w-eyePointsR.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(4).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsR.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(4).y - offsetY)*resizeRatio, (w-eyePointsR.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(5).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
-                                            canvas.drawLine((w-eyePointsR.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(5).y - offsetY)*resizeRatio, (w-eyePointsR.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(0).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                    Log.i(TAG, "on cameraframe");
+                    if (results != null) {
+                        for (final VisionDetRet ret : results) {
+                            float resizeRatio = 4.0f;
+                            float w = imageBitmap.getWidth();
+                            float h = imageBitmap.getHeight();
+                            int offsetX = 33;
+                            int offsetY = 10;
+                            Rect bounds = new Rect();
+                            bounds.left = (int) ((w - ret.getLeft() + widthX- offsetX) * resizeRatio );
+                            bounds.top = (int) ((ret.getTop() - offsetY) * resizeRatio);
+                            bounds.right = (int) ((w - ret.getRight() + widthX - offsetX) * resizeRatio);
+                            bounds.bottom = (int) ((ret.getBottom() - offsetY) * resizeRatio);
+                            canvas = holderTransparent.lockCanvas(null);
+                            canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+                            canvas.drawRect(bounds, mFaceLandmardkPaint);
 
-                                            Log.i(TAG,"Test======");
+                            // Draw landmark
+                            ArrayList<Point> landmarks = ret.getFaceLandmarks();
+                            List<Point> eyePointsL = landmarks.subList(36, 42);
+                            canvas.drawLine((w-eyePointsL.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(0).y - offsetY)*resizeRatio, (w-eyePointsL.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(1).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsL.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(1).y - offsetY)*resizeRatio, (w-eyePointsL.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(2).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsL.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(2).y - offsetY)*resizeRatio, (w-eyePointsL.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(3).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsL.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(3).y - offsetY)*resizeRatio, (w-eyePointsL.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(4).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsL.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(4).y - offsetY)*resizeRatio, (w-eyePointsL.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(5).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsL.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(5).y - offsetY)*resizeRatio, (w-eyePointsL.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsL.get(0).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
 
-                                            double EAR = (compute_EAR(eyePointsL) + compute_EAR(eyePointsR))/2;
-                                            DecimalFormat twoDForm = new DecimalFormat("#.##");
-                                            EAR = Double.valueOf(twoDForm.format(EAR));
-                                            String ear = String.valueOf(EAR);
+                            List<Point> eyePointsR = landmarks.subList(42, 48);
+                            canvas.drawLine((w-eyePointsR.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(0).y - offsetY)*resizeRatio, (w-eyePointsR.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(1).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsR.get(1).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(1).y - offsetY)*resizeRatio, (w-eyePointsR.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(2).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsR.get(2).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(2).y - offsetY)*resizeRatio, (w-eyePointsR.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(3).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsR.get(3).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(3).y - offsetY)*resizeRatio, (w-eyePointsR.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(4).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsR.get(4).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(4).y - offsetY)*resizeRatio, (w-eyePointsR.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(5).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
+                            canvas.drawLine((w-eyePointsR.get(5).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(5).y - offsetY)*resizeRatio, (w-eyePointsR.get(0).x + widthX - offsetX)*resizeRatio, (eyePointsR.get(0).y - offsetY)*resizeRatio, mFaceLandmardkPaint);
 
-                                            Log.i(TAG,"EAR ===== ");
-                                            if(EAR < 0.2)
-                                            {
-                                                count++;
-                                                canvas.drawText(ear, 180, 90, TextPaint);
-                                                if(count >=14)
-                                                {
-                                                    playWarning();
-                                                }
-                                            }
-                                            else {
-                                                canvas.drawText(ear, 180, 90, mFaceLandmardkPaint);
-                                                if(mp.isPlaying())
-                                                    mp.pause();
+                            Log.i(TAG,"Test======");
 
-                                                count = 0;
-                                            }
-                                            holderTransparent.unlockCanvasAndPost(canvas);
+                            double EAR = (compute_EAR(eyePointsL) + compute_EAR(eyePointsR))/2;
+                            DecimalFormat twoDForm = new DecimalFormat("#.##");
+                            EAR = Double.valueOf(twoDForm.format(EAR));
+                            String ear = String.valueOf(EAR);
 
-                                        }
-                                    }
-                                    holderTransparent.setKeepScreenOn(true);
+                            Log.i(TAG,"EAR ===== ");
+                            if(EAR < 0.2)
+                            {
+                                count++;
+                                canvas.drawText(ear, 180, 90, TextPaint);
+                                if(count >=7)
+                                {
+                                    playWarning();
+                                }
+                            }
+                            else {
+                                canvas.drawText(ear, 180, 90, mFaceLandmardkPaint);
+                                if(mp.isPlaying())
+                                    mp.pause();
+
+                                count = 0;
+                            }
+                            holderTransparent.unlockCanvasAndPost(canvas);
+
+                        }
+                    }
+                    holderTransparent.setKeepScreenOn(true);
 
                     Trace.endSection();
                 }
