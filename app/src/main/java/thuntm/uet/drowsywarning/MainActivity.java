@@ -29,15 +29,20 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
-import android.support.annotation.NonNull;
+
+import android.support.constraint.ConstraintLayout;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.Display;
+import android.view.Gravity;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+
 import android.view.WindowManager;
-import android.widget.Toast;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 
 import com.tzutalin.dlib.Constants;
 import com.tzutalin.dlib.FaceDet;
@@ -86,6 +91,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
     MediaPlayer mp;
 
+
     public static int getScreenWidth() {
         return Resources.getSystem().getDisplayMetrics().widthPixels;
     }
@@ -112,8 +118,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         holder = cameraView.getHolder();
 
         holder.addCallback((SurfaceHolder.Callback) this);
-
-        //holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
         cameraView.setSecure(true);
 
@@ -280,7 +284,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
             return;
 
         }
-        Camera.Parameters param = camera.getParameters();
+
         Display display = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
 
         if (display.getRotation() == Surface.ROTATION_0) {
@@ -462,8 +466,34 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         super.onDestroy();
     }
 
+    static private int enterResizeLayout = 0;
+
     @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+    public void surfaceChanged(SurfaceHolder holder, int format, final int width, final int height) {
+        if(enterResizeLayout == 0)
+        {
+            enterResizeLayout = 1;
+
+                    float newProportion = (float) width/height;
+                    int screenWidth =     MainActivity.this.getWindowManager().getDefaultDisplay().getWidth();
+                    int screenHeight =    MainActivity.this.getWindowManager().getDefaultDisplay().getHeight();
+                    float screenProportion = (float) screenWidth / (float) screenHeight;
+                    int widthN, heightN;
+                    if (newProportion > screenProportion) {
+                        widthN = screenWidth;
+                        heightN = (int) ((float) screenWidth / newProportion);
+                    } else {
+                        widthN = (int) (newProportion * (float) screenHeight);
+                        heightN = screenHeight;
+                    }
+                    float propHeight = (float)screenHeight / heightN;
+                    widthN = (int)(widthN * propHeight);
+                    heightN = (int)(heightN * propHeight);
+                    ConstraintLayout.LayoutParams frameLayout = new ConstraintLayout.LayoutParams(widthN,heightN);
+                    cameraView.setLayoutParams(frameLayout);
+
+
+        }
 
         refreshCamera(); //call method for refress camera
 
