@@ -34,15 +34,11 @@ import android.support.constraint.ConstraintLayout;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.Display;
-import android.view.Gravity;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import android.view.WindowManager;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
 
 import com.tzutalin.dlib.Constants;
 import com.tzutalin.dlib.FaceDet;
@@ -323,8 +319,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
                             float resizeRatio = 4.0f;
                             float w = imageBitmap.getWidth();
                             float h = imageBitmap.getHeight();
-                            int offsetX = 33;
-                            int offsetY = 10;
+                            int offsetX = 35;
+                            int offsetY = 0;
                             Rect bounds = new Rect();
                             bounds.left = (int) ((w - ret.getLeft() + widthX- offsetX) * resizeRatio );
                             bounds.top = (int) ((ret.getTop() - offsetY) * resizeRatio);
