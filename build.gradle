@@ -38,8 +38,8 @@ ext {
     versionMajor = 2
     versionMinor = 4
     versionPatch = 11
-    releaseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch
-    releaseVersionName = "${versionMajor}.${versionMinor}.${versionPatch}"
+    releaseVersionCode = 1
+    releaseVersionName = "1.1"
 
     minSdkVersion = 18
     targetSdkVersion = 25

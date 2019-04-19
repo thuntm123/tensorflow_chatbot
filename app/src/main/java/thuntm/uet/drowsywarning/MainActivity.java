@@ -2,7 +2,6 @@ package thuntm.uet.drowsywarning;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
@@ -17,7 +16,6 @@ import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.media.MediaPlayer;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -28,8 +26,6 @@ import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
-import android.renderscript.Type;
-
 import android.support.constraint.ConstraintLayout;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
@@ -37,7 +33,6 @@ import android.view.Display;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-
 import android.view.WindowManager;
 
 import com.tzutalin.dlib.Constants;
@@ -45,13 +40,11 @@ import com.tzutalin.dlib.FaceDet;
 import com.tzutalin.dlib.VisionDetRet;
 import com.tzutalin.dlibtest.R;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import hugo.weaving.DebugLog;
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
@@ -62,7 +55,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
     private RenderScript rs;
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
-    private Type.Builder yuvType, rgbaType;
     private Allocation in, out;
     Camera camera;
 
@@ -71,11 +63,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private HandlerThread inferenceThread;
     private Canvas canvas = null;
     private int count = 0, k = 0, cnt = 0;
-    private static final int MY_CAMERA_REQUEST_CODE = 100;
+
     int deviceHeight, deviceWidth;
     Bitmap imageBitmap;
     private FaceDet mFaceDet;
-    private Context mContext;
     private float RectLeft, RectTop, RectRight, RectBottom;
     private static final int REQUEST_CODE_PERMISSION = 2;
 
@@ -99,25 +90,16 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
-
-        mContext = this;
-        rs = RenderScript.create(this);
-
-        yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
-
         setContentView(R.layout.activity_drawon_camera);
-
-        cameraView = (SurfaceView) findViewById(R.id.CameraView);
+        rs = RenderScript.create(this);
+        yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
+        cameraView =  findViewById(R.id.CameraView);
 
         holder = cameraView.getHolder();
-
-        holder.addCallback((SurfaceHolder.Callback) this);
-
+        holder.addCallback(this);
         cameraView.setSecure(true);
-
-        mp = (MediaPlayer) MediaPlayer.create(this, R.raw.warning);
+        mp = MediaPlayer.create(this, R.raw.warning);
         AssetManager am = this.getAssets();
         try {
             AssetFileDescriptor afd = am.openFd("android.resource://"+getPackageName()+"/"+R.raw.warning);
@@ -135,17 +117,17 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
         mp.setLooping(true);
         // playWarning();
-        transparentView = (SurfaceView) findViewById(R.id.TransparentView);
+        transparentView =  findViewById(R.id.TransparentView);
 
         holderTransparent = transparentView.getHolder();
 
-        holderTransparent.addCallback((SurfaceHolder.Callback) this);
+        holderTransparent.addCallback(this);
 
         holderTransparent.setFormat(PixelFormat.TRANSLUCENT);
 
         transparentView.setZOrderMediaOverlay(true);
 
-        rectView = (SurfaceView) findViewById(R.id.RectView);
+        rectView = findViewById(R.id.RectView);
 
         holderRect = rectView.getHolder();
         holderRect.addCallback(this);
@@ -166,8 +148,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         TextPaint = new Paint();
         TextPaint.setColor(Color.RED);
         TextPaint.setStrokeWidth(2);
-        TextPaint.setStyle(Paint.Style.STROKE);
-        TextPaint.setTextSize(20 * getResources().getDisplayMetrics().density);
+        TextPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        TextPaint.setTextSize(40 * getResources().getDisplayMetrics().density);
 
         inferenceThread = new HandlerThread("InferenceThread");
         inferenceThread.start();
@@ -230,7 +212,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
         paint.setStyle(Paint.Style.STROKE);
 
-        paint.setColor(Color.GREEN);
+        paint.setColor(Color.BLUE);
 
         paint.setStrokeWidth(3);
 
@@ -245,7 +227,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         Rect rec=new Rect((int) RectLeft,(int)RectTop,(int)RectRight,(int)RectBottom);
 
         canvas1.drawRect(rec,paint);
-        canvas1.drawText("EAR:",50, 90, mFaceLandmardkPaint);
+        canvas1.drawText("Tỉ số mở mắt:",0, 90, mFaceLandmardkPaint);
         holderRect.unlockCanvasAndPost(canvas1);
 
     }
@@ -253,26 +235,16 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     @Override
     public void surfaceCreated(final SurfaceHolder holder) {
 
-        new AsyncTask<Void, Void, Void>() {
-
-            @Override
-            protected Void doInBackground(Void... voids) {
-                if (!new File(Constants.getFaceShapeModelPath()).exists()) {
-                    FileUtils.copyFileFromRawToOthers(getApplicationContext(), R.raw.shape_predictor_68_face_landmarks, Constants.getFaceShapeModelPath());
-                }
-
-                return null;
-            }
-        }.execute();
 
         try {
 
             synchronized (holder) {
-                Draw();
+                if(holder != null){Draw();}
             }
 
-            camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
-
+            if(camera == null){
+                camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+            }
         } catch (Exception e) {
 
             Log.i("Exception", e.toString());
@@ -359,14 +331,14 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
                             if(EAR < 0.2)
                             {
                                 count++;
-                                canvas.drawText(ear, 180, 90, TextPaint);
+                                canvas.drawText(ear, 100, 200, TextPaint);
                                 if(count >=7)
                                 {
                                     playWarning();
                                 }
                             }
                             else {
-                                canvas.drawText(ear, 180, 90, mFaceLandmardkPaint);
+                                canvas.drawText(ear, 100, 200, mFaceLandmardkPaint);
                                 if(mp.isPlaying())
                                     mp.pause();
 
@@ -375,6 +347,12 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
                             holderTransparent.unlockCanvasAndPost(canvas);
 
                         }
+                    }
+                    else
+                    {
+                        canvas = holderTransparent.lockCanvas(null);
+                        canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+                        holderTransparent.unlockCanvasAndPost(canvas);
                     }
                     holderTransparent.setKeepScreenOn(true);
 

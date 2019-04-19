@@ -34,12 +34,13 @@ public class FileUtils {
         FileOutputStream out = null;
         try {
             out = new FileOutputStream(targetPath);
-            byte[] buff = new byte[1024];
-            int read = 0;
-            while ((read = in.read(buff)) > 0) {
-                out.write(buff, 0, read);
+            byte[] buff = new byte[20480];
+            int len = 0;
+            while ((len = in.read(buff)) > 0) {
+                out.write(buff, 0, len);
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         } finally {
             try {
